@@ -146,6 +146,52 @@ class PolicyAccounting(object):
         else:
             print "POLICY with ID {0} SHOULD NOT CANCEL".format(self.id)
 
+    def update_billing_type(self, date_cursor=None, bill_type=None):
+        """
+        This method allows to update billing schedule during billing cycle
+
+        Parameters:
+        date_cursor: date threshold for actions
+        bill_type: type of bill schedule 
+        """
+        if bill_type is None:
+            print "Provided new bill type is invalid for policy id {0}".format(self.policy.id)
+            return
+
+        if bill_type == self.policy.billing_schedule:
+            print "Can't update. Policy id {0} has already same billing schedule.".format(self.policy.id)
+            return
+
+        prev_invoices = Invoice.query.filter_by(policy_id=self.policy.id)\
+                                .order_by(Invoice.bill_date)\
+                                .all()
+
+        for invoice in prev_invoices:
+            invoice.deleted = True
+
+        self.policy.billing_schedule = bill_type
+        db.session.commit()
+
+        if not date_cursor:
+            date_cursor = datetime.now().date()
+
+        self.policy.effective_date = date_cursor
+
+        payments = Payment.query.filter_by(policy_id=self.policy.id)\
+                                .filter(Payment.transaction_date <= date_cursor)\
+                                .all()
+
+        # subtract previous balance for calculating new type of invoice amounts
+        bal = 0
+        for payment in payments:
+            bal += payment.amount_paid
+
+        self.policy.annual_premium = self.policy.annual_premium - bal
+        db.session.commit()
+        
+        self.make_invoices()
+        print "Updated billing schedule for policy id {0}".format(self.policy.id)
+
 
     def make_invoices(self):
         """
