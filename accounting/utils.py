@@ -186,6 +186,33 @@ class PolicyAccounting(object):
             db.session.add(invoice)
         db.session.commit()
 
+
+def record_a_payment(policy_id=None, amount=0, date=None):
+    """
+    This function records a payment transaction in database for shell.
+
+    Parameters:
+    policy_id: id of policy for which payment is to be made.
+    amount: payment amount
+    date: payment date in string format "2019-03-12"
+    """  
+    if policy_id is None or type(policy_id) != int:
+        print "Please provide a valid policy id to record this payment"
+        return
+
+    pa = PolicyAccounting(policy_id)
+
+    if date is not None:
+        date = datetime.strptime(date, '%Y-%m-%d')
+
+    payment = pa.make_payment(date_cursor=date, amount=amount)
+    if payment:  # in case of successful payment
+        print "Payment Recorded. Info: payment_id: {0}, policy_id: {1}, contact_id: {2},amount_paid: {3}, date: {4}".format(payment.id,
+            payment.policy_id, payment.contact_id, payment.amount_paid, payment.transaction_date)
+    else:
+        print "Payment of {0} against policy id {1} was not successful.".format(amount, policy_id)
+
+
 ################################
 # The functions below are for the db and 
 # shouldn't need to be edited.
@@ -219,6 +246,7 @@ def insert_data():
     policies = []
     p1 = Policy('Policy One', date(2015, 1, 1), 365)
     p1.billing_schedule = 'Annual'
+    p1.named_insured = john_doe_insured.id
     p1.agent = bob_smith.id
     policies.append(p1)
 
