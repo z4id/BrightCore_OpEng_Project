@@ -78,7 +78,7 @@ class PolicyAccounting(object):
         if self.evaluate_cancellation_pending_due_to_non_pay(date_cursor):
             # Policy becomes default due to non payment after due date
             if self.policy.status == "Default":
-                contact = Contact.filter_by(id=contact_id).one()
+                contact = Contact.query.filter_by(id=contact_id).one()
                 if contact.role == "Named Insured":
                     # In case atleast one invoice of a policy is has due date crossed, only an agent can
                     # pay it not the Named Insured
@@ -141,10 +141,30 @@ class PolicyAccounting(object):
             if not self.return_account_balance(invoice.cancel_date):
                 continue
             else:
+                message = "Cancelled due to unpaid invoice bill"
+                self.cancel_policy(date_cursor, message)
                 print "POLICY with ID {0} SHOULD HAVE CANCELED".format(self.id)
                 break
         else:
             print "POLICY with ID {0} SHOULD NOT CANCEL".format(self.id)
+
+    def cancel_policy(self, date_cursor=None, message=None):
+        """
+        This method cancels a policy provided the date and message 
+        for cancellation purpose.
+
+        Parameters:
+        date_cursor: date threshold to perform certain actions
+        message: string to state reason of cancellation
+        """
+        if not date_cursor:
+            date_cursor = datetime.now().date()
+
+        self.policy.status = "Canceled"
+        self.policy.cancel_date = date_cursor
+        self.policy.cancel_message = message
+
+        db.session.commit()
 
     def update_billing_type(self, date_cursor=None, bill_type=None):
         """
