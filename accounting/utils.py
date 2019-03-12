@@ -75,6 +75,15 @@ class PolicyAccounting(object):
             except:
                 print "Insured name of policy_id {0} does not exist in Contacts.".format(self.id) 
 
+        if self.evaluate_cancellation_pending_due_to_non_pay(date_cursor):
+            # Policy becomes default due to non payment after due date
+            if self.policy.status == "Default":
+                contact = Contact.filter_by(id=contact_id).one()
+                if contact.role == "Named Insured":
+                    # In case atleast one invoice of a policy is has due date crossed, only an agent can
+                    # pay it not the Named Insured
+                    return None
+
         payment = Payment(self.policy.id,
                           contact_id,
                           amount,
@@ -90,8 +99,27 @@ class PolicyAccounting(object):
          on a policy has passed the due date without
          being paid in full. However, it has not necessarily
          made it to the cancel_date yet.
+
+         Parameters:
+         date_cursor: date threshold for an action
+
+         Returns:
+         Bololean value
         """
-        pass
+        if not date_cursor:
+            date_cursor = datetime.now().date()
+
+        invoices = Invoice.query.filter_by(policy_id=self.policy.id)\
+                                .filter(Invoice.due_date < date_cursor <= Invoice.cancel_date)\
+                                .order_by(Invoice.bill_date)\
+                                .all()
+
+        if len(invoices) > 0:
+            self.policy.status = 'Default'
+            db.session.commit()
+            return True
+        else:
+            return False
 
     def evaluate_cancel(self, date_cursor=None):
         """
